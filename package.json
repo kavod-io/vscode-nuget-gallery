@@ -1,87 +1,138 @@
 {
-	"name": "vscode-nuget-gallery",
-	"displayName": "NuGet Gallery",
-	"publisher": "patcx",
-	"description": "NuGet Gallery Extension makes installing and uninstalling NuGet packages easier",
-	"license": "ISC",
-	"version": "0.0.24",
-	"preview": true,
-	"icon": "docs/images/icon.png",
-	"engines": {
-		"vscode": "^1.37.0"
-	},
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/pcislo/vscode-nuget-gallery"
-	},
-	"categories": [
-		"Other"
-	],
-	"activationEvents": [
-		"onCommand:extension.start"
-	],
-	"main": "./out/extension.js",
-	"contributes": {
-		"commands": [
-			{
-				"command": "extension.start",
-				"title": "Open NuGet Gallery",
-				"category": "NuGet"
-			}
-		],
-		"menus": {
-			"explorer/context": [
-				{
-					"when": "resourceExtname == .csproj || resourceExtname == .vbproj || resourceExtname == .fsproj || resourceExtname == .sln",
-					"command": "extension.start",
-					"group": "navigation"
-				}
-			]
-		},
-		"configuration": {
-			"title": "NuGet Gallery",
-			"properties": {
-				"NugetGallery.credentialProviderFolder": {
-					"type": "string",
-					"default": "%UserProfile%/.nuget/plugins/netfx/CredentialProvider.Microsoft",
-					"description": "Folder path containing CredentialProvider.Microsoft.exe"
-				},
-				"NugetGallery.sources": {
-					"type": "array",
-					"items": {
-						"type": "string"
-					},
-					"uniqueItems": true,
-					"minItems": 1,
-					"default": [
-						"{\"name\": \"nuget.org\",\"url\": \"https://api.nuget.org/v3/index.json\"}"
-					],
-					"description": "NuGet sources"
-				}
-			}
-		}
-	},
-	"scripts": {
-		"vscode:prepublish": "yarn run compile",
-		"compile": "tsc -p ./",
-		"watch": "tsc -watch -p ./",
-		"pretest": "yarn run compile",
-		"test": "node ./out/test/runTest.js"
-	},
-	"devDependencies": {
-		"@types/glob": "^7.1.1",
-		"@types/mocha": "^5.2.6",
-		"@types/node": "^10.12.21",
-		"@types/vscode": "^1.37.0",
-		"glob": "^7.1.4",
-		"mocha": "^6.1.4",
-		"tslint": "^5.12.1",
-		"typescript": "^3.3.1",
-		"vscode-test": "^1.0.2"
-	},
-	"dependencies": {
-		"axios": "^0.19.0",
-		"xmldom": "^0.1.27",
-		"xpath": "^0.0.27"
-	}
+  "name": "vscode-nuget-gallery",
+  "displayName": "NuGet Gallery",
+  "publisher": "kavod.io",
+  "description": "NuGet Gallery Extension makes installing and uninstalling NuGet packages easier",
+  "license": "ISC",
+  "version": "0.0.25",
+  "preview": true,
+  "icon": "docs/images/icon.png",
+  "engines": {
+    "vscode": "^1.75.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pcislo/vscode-nuget-gallery"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:extension.start"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "extension.start",
+        "title": "Open NuGet Gallery",
+        "category": "NuGet"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "when": "resourceExtname == .csproj || resourceExtname == .vbproj || resourceExtname == .fsproj || resourceExtname == .sln",
+          "command": "extension.start",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "NuGet Gallery",
+      "properties": {
+        "NugetGallery.credentialProviderFolder": {
+          "type": "string",
+          "default": "%UserProfile%/.nuget/plugins/netfx/CredentialProvider.Microsoft",
+          "description": "Folder path containing CredentialProvider.Microsoft.exe"
+        },
+        "NugetGallery.sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "required": true,
+                "type": "string",
+                "description": "A user-defined name for this Nuget source."
+              },
+              "url": {
+                "required": true,
+                "type": "string",
+                "description": "The address to the service index for the given Nuget source."
+              },
+              "requiresAuth": {
+                "required": false,
+                "type": "boolean",
+                "description": "Whether this Nuget source requires authentication.  Currently only supports Basic auth by accessing credentials from Windows Credential Manager"
+              }
+            }
+          },
+          "uniqueItems": true,
+          "minItems": 1,
+          "default": [
+            {
+              "name": "nuget.org",
+              "url": "https://api.nuget.org/v3/index.json"
+            }
+          ],
+          "description": "NuGet sources"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "yarn run compile && cd web && yarn run build && cd ..",
+    "compile": "tsc -p ./",
+    "type-check": "tsc --noEmit",
+    "format": "prettier --write src/",
+    "lint": "eslint -c .eslintrc.js --ext .ts src"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.17",
+    "@types/vscode": "^1.75.1",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "glob": "^10.3.10",
+    "mocha": "^10.3.0",
+    "prettier": "^3.0.3",
+    "typescript": "^5.3.3",
+    "vscode-test": "^1.6.1"
+  },
+  "dependencies": {
+    "axios": "^1.6.7",
+    "xmldom": "^0.6.0",
+    "xpath": "^0.0.34"
+  },
+  "prettier": {
+    "$schema": "https://json.schemastore.org/prettierrc",
+    "endOfLine": "auto",
+    "semi": false,
+    "tabWidth": 2,
+    "singleQuote": true,
+    "printWidth": 100,
+    "trailingComma": "none"
+  },
+  "eslintConfig": {
+    "root": true,
+    "parser": "@typescript-eslint/parser",
+    "plugins": [
+      "@typescript-eslint"
+    ],
+    "extends": [
+      "eslint:recommended",
+      "plugin:@typescript-eslint/recommended",
+      "plugin:prettier/recommended"
+    ],
+    "rules": {
+      "@typescript-eslint/no-unused-vars": 0,
+      "@typescript-eslint/no-explicit-any": 0,
+      "@typescript-eslint/explicit-module-boundary-types": 0,
+      "@typescript-eslint/no-non-null-assertion": 0
+    }
+  }
 }

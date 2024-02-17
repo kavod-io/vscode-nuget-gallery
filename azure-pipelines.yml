@@ -1,40 +1,164 @@
-# Node.js
-# Build a general Node.js project with npm.
-# Add steps that analyze code, save build artifacts, deploy, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
+trigger: none
 
-trigger:
-- release/*
+pr:
+  branches:
+    include:
+      - master
+      - develop
+  autoCancel: true
+  drafts: false
 
-pool:
-  vmImage: 'ubuntu-latest'
+parameters:
+  - name: ReleaseVersion
+    displayName: Release Version
+    type: string
+    default: ''
 
-steps:
-- task: NodeTool@0
-  inputs:
-    versionSpec: '10.x'
-  displayName: 'Install Node.js'
+variables:
+  - group: Open VSX access token
+  - group: vscode-marketplace-credentials
+  - name: artifactName
+    value: vsix
+  - name: vsixName
+    value: vscode-jest-test-adapter.vsix
 
-- script: yarn install
-  displayName: yarn install
+stages:
+  - stage: Build
+    jobs:
+      - job: Build
+        pool:
+          vmImage: ubuntu-20.04
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: 18.x
+            displayName: Install Node.js
 
-- script: |
-      yarn --cwd web install
-      yarn --cwd web build
-  displayName: build web
+          - script: python3 pipelines/update_package_version.py
+            displayName: Update Version in package.json
+            failOnStderr: true
+            env:
+              VERSION: ${{ parameters.ReleaseVersion }}
+              BRANCH: $('Build.SourceBranch')
+              REASON: $('Build.Reason')
 
-- script: |
-    sudo yarn global add vsce
-    vsce package
-  displayName: Create VSIX
+          - bash: |
+              yarn install --frozen-lockfile
+              cd web
+              yarn install --frozen-lockfile
+              cd ..
+            displayName: Restore Dependencies
+            failOnStderr: false
 
-- task: CopyFiles@2
-  inputs:
-    Contents: '*.vsix'
-    TargetFolder: '$(Build.ArtifactStagingDirectory)'
+          - bash: |
+              cd web
+              yarn run build
+              cd ..
+              yarn run build
+            displayName: Build
+            failOnStderr: false
 
-- task: PublishBuildArtifacts@1
-  inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-    ArtifactName: 'drop'
-    publishLocation: 'Container'
+          # - bash: yarn run test-ci
+          #   displayName: Run Jest Tests
+          #   failOnStderr: true
+
+          # - task: PublishTestResults@2
+          #   displayName: Publish Test Results
+          #   inputs:
+          #     testResultsFormat: JUnit
+          #     testResultsFiles: '**/junit.xml'
+          #     failTaskOnFailedTests: true
+
+          # - task: PublishCodeCoverageResults@1
+          #   displayName: Publish Code Coverage
+          #   inputs:
+          #     codeCoverageTool: cobertura
+          #     summaryFileLocation: $(System.DefaultWorkingDirectory)/coverage/cobertura-coverage.xml
+          #     failIfCoverageEmpty: true
+
+          - bash: |
+              npm install -g @vscode/vsce
+              mkdir build
+              if [ "$(isPreRelease)" == "true" ]; then
+                echo "Building pre-release VSIX..."
+                vsce package --pre-release -o build/$(vsixName)
+              else
+                echo "Building release VSIX..."
+                vsce package -o build/$(vsixName)
+              fi
+            displayName: Package VSIX
+            failOnStderr: true
+
+          - task: PublishPipelineArtifact@0
+            displayName: Publish VSIX Artifact
+            inputs:
+              artifactName: $(artifactName)
+              targetPath: build
+
+  - stage: Release
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['canRelease'], true))
+    jobs:
+      - deployment:
+        displayName: Deployment
+        pool:
+          vmImage: ubuntu-20.04
+        environment: release
+        variables:
+          name: vsixPath
+          value: $(Pipeline.Workspace)/$(artifactName)/$(vsixName)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  displayName: Checkout Source Code
+
+                - script: python3 pipelines/update_package_version.py
+                  displayName: Update Version in package.json
+                  failOnStderr: true
+                  env:
+                    VERSION: ${{ parameters.ReleaseVersion }}
+                    BRANCH: $('Build.SourceBranch')
+                    REASON: $('Build.Reason')
+
+                - download: current
+                  displayName: Download Artifact
+                  artifact: $(artifactName)
+
+                - bash: |
+                    pwd
+                    tree -R
+                  displayName: Debug
+                  workingDirectory: $(System.DefaultWorkingDirectory)
+
+                - task: GitHubRelease@1
+                  displayName: Create GitHub release
+                  inputs:
+                    gitHubConnection: github.com_rossknudsen
+                    tagSource: userSpecifiedTag
+                    tag: 'v$(ReleaseVersion)'
+                    assets: $(vsixPath)
+                    isPreRelease: $(isPreRelease)
+                    addChangeLog: false
+
+                - bash: |
+                    yarn install -g @vscode/vsce
+                    if [ "$(isPreRelease)" == "true" ]; then
+                      echo "Creating pre-release version..."
+                      vsce publish --pre-release -p $MARKET_KEY --packagePath "$(vsixPath)"
+                    else
+                      echo "Creating release version..."
+                      vsce publish -p $MARKET_KEY --packagePath "$(vsixPath)"
+                    fi
+                  failOnStderr: true
+                  displayName: Release extension to marketplace
+                  env:
+                    MARKET_KEY: $(vscode-marketplace-access-token)
+
+                - bash: |
+                    npx ovsx publish "$(vsixPath)" -p $OPEN_VSX_KEY
+                  displayName: Release extension to Open VSX
+                  condition: $(not(isPreRelease))
+                  env:
+                    OPEN_VSX_KEY: $(open-vsx-token)

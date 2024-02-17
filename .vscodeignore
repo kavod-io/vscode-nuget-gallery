@@ -1,16 +1,10 @@
-.vscode/**
-.vscode-test/**
-out/test/**
-src/**
-.gitignore
-vsc-extension-quickstart.md
-**/tsconfig.json
-**/tslint.json
-**/*.map
-**/*.ts
-web/node_modules/**
-**/babel.config.js
-**/package-lock.json
-**/yarn.lock
-**/vue.config.js
-azure-pipelines.yml 
+# ignore everything
+**/*
+
+!docs/**/*
+!out/**/*
+!web/dist/**/*
+
+!package.json
+!README.md
+!LICENSE.txt
